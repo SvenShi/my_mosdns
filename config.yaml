@@ -1,0 +1,330 @@
+log:
+  level: info
+  file: "/var/log/mosdns.log"
+
+api:
+  http: "0.0.0.0:9091"
+
+plugins:
+  - tag: geosite_cn
+    type: domain_set
+    args:
+      files:
+        - "/opt/mosdns/dat/geosite_cn.txt"
+  
+  - tag: geoip_cn
+    type: ip_set
+    args:
+      files:
+        - "/opt/mosdns/dat/geoip_cn.txt"
+  
+  - tag: geosite_apple
+    type: domain_set
+    args:
+      files:
+        - "/opt/mosdns/dat/geosite_apple.txt"
+  
+  - tag: geosite_no_cn
+    type: domain_set
+    args:
+      files:
+        - "/opt/mosdns/dat/geosite_geolocation-!cn.txt"
+  
+  - tag: whitelist
+    type: domain_set
+    args:
+      files:
+        - "/opt/mosdns/rule/whitelist.txt"
+  
+  - tag: blocklist
+    type: domain_set
+    args:
+      files:
+        - "/opt/mosdns/rule/blocklist.txt"
+  
+  - tag: greylist
+    type: domain_set
+    args:
+      files:
+        - "/opt/mosdns/rule/greylist.txt"
+  
+  - tag: ddnslist
+    type: domain_set
+    args:
+      files:
+        - "/opt/mosdns/rule/ddnslist.txt"
+  
+  - tag: hosts
+    type: hosts
+    args:
+      files:
+        - "/opt/mosdns/rule/hosts.txt"
+  
+  - tag: redirect
+    type: redirect
+    args:
+      files:
+        - "/opt/mosdns/rule/redirect.txt"
+  
+  - tag: adlist
+    type: domain_set
+    args:
+      files:
+        - "/opt/mosdns/dat/disable-ads.txt"
+  
+  - tag: local_ptr
+    type: domain_set
+    args:
+      files:
+        - "/opt/mosdns/rule/local-ptr.txt"
+  
+  - tag: domain_custom_dns
+    type: domain_set
+    args:
+      files:
+        - "/opt/mosdns/rule/domain-countom-dns.txt"
+  
+  - tag: stream_media
+    type: domain_set
+    args:
+      files:
+        - "/opt/mosdns/dat/geosite_disney.txt"
+        - "/opt/mosdns/dat/geosite_netflix.txt"
+        - "/opt/mosdns/dat/geosite_hulu.txt"
+        - "/opt/mosdns/rule/streaming.txt"
+  
+  - tag: cloudflare_cidr
+    type: ip_set
+    args:
+      files:
+        - "/opt/mosdns/rule/cloudflare-cidr.txt"
+  
+  - tag: lazy_cache
+    type: cache
+    args:
+      size: 10240
+      lazy_cache_ttl: 18000
+      dump_file: "/opt/mosdns/cache.dump"
+      dump_interval: 3600
+  
+  - tag: forward_xinfeng_udp
+    type: forward
+    args:
+      concurrent: 2
+      upstreams:
+        - addr: "114.114.114.114"
+        - addr: "114.114.115.115"
+  
+  - tag: forward_local
+    type: forward
+    args:
+      concurrent: 3
+      upstreams:
+        - addr: "udp://61.139.2.69"
+          bootstrap: "119.29.29.29"
+          enable_pipeline: false
+          insecure_skip_verify: false
+          idle_timeout: 30
+        - addr: "udp://218.6.200.139"
+          bootstrap: "119.29.29.29"
+          enable_pipeline: false
+          insecure_skip_verify: false
+          idle_timeout: 30
+        - addr: "udp://223.5.5.5"
+          bootstrap: "119.29.29.29"
+          enable_pipeline: false
+          insecure_skip_verify: false
+          idle_timeout: 30
+  
+  - tag: forward_custom
+    type: forward
+    args:
+      concurrent: 1
+      upstreams:
+        - addr: "udp://172.31.0.1:9953"
+          bootstrap: "119.29.29.29"
+          enable_pipeline: false
+          insecure_skip_verify: false
+          idle_timeout: 30
+  
+  - tag: forward_remote
+    type: forward
+    args:
+      concurrent: 2
+      upstreams:
+        - addr: "udp://8.8.8.8"
+          bootstrap: "119.29.29.29"
+          enable_pipeline: false
+          insecure_skip_verify: false
+          idle_timeout: 30
+        - addr: "udp://1.1.1.1"
+          bootstrap: "119.29.29.29"
+          enable_pipeline: false
+          insecure_skip_verify: false
+          idle_timeout: 30
+  
+  - tag: forward_remote_upstream
+    type: sequence
+    args:
+      - exec: "prefer_ipv4"
+      - exec: "$forward_remote"
+  
+  - tag: forward_stream_media
+    type: forward
+    args:
+      concurrent: 1
+      upstreams:
+        - addr: "tls://8.8.8.8"
+          bootstrap: "119.29.29.29"
+          enable_pipeline: false
+          insecure_skip_verify: false
+          idle_timeout: 30
+  
+  - tag: forward_stream_media_upstream
+    type: sequence
+    args:
+      - exec: "prefer_ipv4"
+      - exec: "$forward_stream_media"
+  
+  - tag: modify_ttl
+    type: sequence
+    args:
+      - exec: "ttl 0-0"
+  
+  - tag: modify_ddns_ttl
+    type: sequence
+    args:
+      - exec: "ttl 5-5"
+  
+  - tag: has_resp_sequence
+    type: sequence
+    args:
+      - matches: "qname $ddnslist"
+        exec: "$modify_ddns_ttl"
+      - matches: "!qname $ddnslist"
+        exec: "$modify_ttl"
+      - matches: "has_resp"
+        exec: "accept"
+  
+  - tag: query_is_non_local_ip
+    type: sequence
+    args:
+      - exec: "$forward_local"
+      - matches: "!resp_ip $geoip_cn"
+        exec: "drop_resp"
+  
+  - tag: fallback
+    type: fallback
+    args:
+      primary: forward_remote_upstream
+      secondary: forward_remote_upstream
+      threshold: 500
+      always_standby: true
+  
+  - tag: apple_domain_fallback
+    type: fallback
+    args:
+      primary: query_is_non_local_ip
+      secondary: forward_xinfeng_udp
+      threshold: 100
+      always_standby: true
+  
+  - tag: query_is_apple_domain
+    type: sequence
+    args:
+      - matches: "!qname $geosite_apple"
+        exec: "return"
+      - exec: "$apple_domain_fallback"
+  
+  - tag: query_is_ddns_domain
+    type: sequence
+    args:
+      - matches: "qname $ddnslist"
+        exec: "$forward_local"
+  
+  - tag: query_is_local_domain
+    type: sequence
+    args:
+      - matches: "qname $geosite_cn"
+        exec: "$forward_local"
+  
+  - tag: query_is_no_local_domain
+    type: sequence
+    args:
+      - matches: "qname $geosite_no_cn"
+        exec: "$forward_remote_upstream"
+  
+  - tag: query_is_domain_custom_dns
+    type: sequence
+    args:
+      - matches: "qname $domain_custom_dns"
+        exec: "$forward_custom"
+  
+  - tag: query_is_whitelist_domain
+    type: sequence
+    args:
+      - matches: "qname $whitelist"
+        exec: "$forward_local"
+  
+  - tag: query_is_greylist_domain
+    type: sequence
+    args:
+      - matches: "qname $greylist"
+        exec: "$forward_remote_upstream"
+  
+  - tag: query_is_reject_domain
+    type: sequence
+    args:
+      - matches: "qname $blocklist"
+        exec: "reject 3"
+      - matches: "qname $adlist"
+        exec: "reject 3"
+      - matches: ["qtype 12", "qname $local_ptr"]
+        exec: "reject 3"
+      - matches: "qtype 65"
+        exec: "reject 3"
+  
+  - tag: query_is_stream_media_domain
+    type: sequence
+    args:
+      - matches: "qname $stream_media"
+        exec: "$forward_stream_media_upstream"
+  
+  - tag: main_sequence
+    type: sequence
+    args:
+      - exec: "$hosts"
+      - exec: "jump has_resp_sequence"
+      - matches: ["!qname $ddnslist", "!qname $blocklist", "!qname $adlist", "!qname $local_ptr"]
+        exec: "$lazy_cache"
+      - exec: "$redirect"
+      - exec: "jump has_resp_sequence"
+      - exec: "$query_is_domain_custom_dns"
+      - exec: "jump has_resp_sequence"
+      - exec: "$query_is_ddns_domain"
+      - exec: "jump has_resp_sequence"
+      - exec: "$query_is_stream_media_domain"
+      - exec: "jump has_resp_sequence"
+      - exec: "$query_is_whitelist_domain"
+      - exec: "jump has_resp_sequence"
+      - exec: "$query_is_local_domain"
+      - exec: "jump has_resp_sequence"
+      - exec: "$query_is_no_local_domain"
+      - exec: "jump has_resp_sequence"
+      - exec: "$query_is_greylist_domain"
+      - exec: "jump has_resp_sequence"
+      - exec: "$query_is_reject_domain"
+      - exec: "jump has_resp_sequence"
+      - exec: "$fallback"
+  
+  - tag: "udp_server"
+    type: "udp_server"
+    args: 
+      entry:  "main_sequence"
+      listen:  ":5335"
+
+  - tag: "tcp_server"
+    type: "tcp_server"
+    args: 
+      entry:  "main_sequence"
+      listen:  ":5335"
