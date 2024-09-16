@@ -98,7 +98,7 @@ plugins:
     args:
       files:
         - "/opt/mosdns/rule/cloudflare-cidr.txt"
-  
+  # 缓存
   - tag: lazy_cache
     type: cache
     args:
@@ -114,7 +114,7 @@ plugins:
       upstreams:
         - addr: "114.114.114.114"
         - addr: "114.114.115.115"
-  
+  # 国内IP
   - tag: forward_local
     type: forward
     args:
@@ -135,7 +135,7 @@ plugins:
           enable_pipeline: false
           insecure_skip_verify: false
           idle_timeout: 30
-  
+  # 当匹配到domain-countom-dns.txt域名时使用以下dns解析
   - tag: forward_custom
     type: forward
     args:
@@ -146,7 +146,7 @@ plugins:
           enable_pipeline: false
           insecure_skip_verify: false
           idle_timeout: 30
-  
+  # 国外dns
   - tag: forward_remote
     type: forward
     args:
