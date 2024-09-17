@@ -26,5 +26,12 @@ cd /opt/mosdns
 
 并发线程部分针对国内外有不同配置，另外附加了匹配域名走指定dns的功能
 ![alt text](img/image.png)
+
+___
+
 ![alt text](img/image-2.png)
+
+___
+
 ![alt text](img/image-1.png)
+
